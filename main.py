@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 import os
 import asyncio
+import re
 import discord
 import yt_dlp
 
@@ -38,13 +39,26 @@ async def send_help(message):
     help_text = """
 🎵 **Music Bot Commands**
 
-`$play <youtube_url>` → Play or queue a song  
-`$next` → Skip song  
-`$previous` → Go back  
-`$stop` → Stop and disconnect  
-`$queue` → Show queue  
-`$ping` → Check bot  
-`$help` → Show help
+`$play <youtube_url or search term>`
+• Play a YouTube video or search for a song.
+
+`$next`
+• Skip to the next song.
+
+`$previous`
+• Go back to previous song.
+
+`$queue`
+• Show current queue.
+
+`$stop`
+• Stop playback and disconnect.
+
+`$ping`
+• Check bot status.
+
+`$help`
+• Show this help.
 """
     await message.channel.send(help_text)
 
@@ -58,6 +72,16 @@ def now_playing_text(title):
         f"📋 Queue size: {len(song_queue)} song(s)\n"
         f"▶️ In session: #{len(song_history)}"
     )
+
+
+# -----------------------------
+# YOUTUBE URL CHECK
+# -----------------------------
+def is_youtube_url(url: str) -> bool:
+    youtube_regex = re.compile(
+        r"(https?://)?(www\.)?(youtube\.com|youtu\.be|music\.youtube\.com)/.+"
+    )
+    return bool(youtube_regex.match(url))
 
 
 # -----------------------------
@@ -85,17 +109,45 @@ async def on_message(message):
 
     # ---------------- PLAY ----------------
     elif message.content.startswith("$play"):
-        try:
-            url = message.content.split(" ", 1)[1]
-        except IndexError:
-            await message.channel.send("Usage: `$play <youtube_url>`")
+        parts = message.content.split(" ", 1)
+
+        if len(parts) < 2:
+            await message.channel.send("Usage: `$play <youtube_url or search term>`")
             return
+
+        query = parts[1].strip()
 
         voice_client = await join_voice_channel_from_message(message)
         if voice_client is None:
             return
 
-        # Extract video info
+        # ---------------- URL MODE ----------------
+        if is_youtube_url(query):
+            url = query
+
+        # ---------------- SEARCH MODE ----------------
+        else:
+            await message.channel.send(f"🔎 Searching YouTube for: **{query}**")
+
+            loop = asyncio.get_running_loop()
+
+            def search():
+                with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+                    return ydl.extract_info(
+                        f"ytsearch1:{query}",
+                        download=False
+                    )
+
+            info = await loop.run_in_executor(None, search)
+
+            if not info or "entries" not in info or len(info["entries"]) == 0:
+                await message.channel.send("❌ No results found.")
+                return
+
+            video = info["entries"][0]
+            url = video["webpage_url"]
+
+        # ---------------- FETCH METADATA ----------------
         with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
             info = ydl.extract_info(url, download=False)
 
@@ -106,10 +158,11 @@ async def on_message(message):
             "title": title
         }
 
+        # ---------------- QUEUE LOGIC ----------------
         if voice_client.is_playing() or voice_client.is_paused():
             song_queue.append(song_data)
             await message.channel.send(
-                f"➕ Added to queue: {title} (#{len(song_queue)})"
+                f"➕ Added to queue: **{title}** (#{len(song_queue)})"
             )
         else:
             await play_youtube_audio(
