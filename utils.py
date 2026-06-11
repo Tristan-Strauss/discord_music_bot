@@ -20,26 +20,23 @@ def now_playing_text(title, song_queue, song_history):
 
 async def send_help(channel):
     help_text = """
-🎵 **Music Bot Commands**
-
+**Music Bot Commands**
 `$play <youtube_url or search term>`
 • Play a YouTube video or search for a song.
-
 `$next`
 • Skip to the next song.
-
 `$previous`
 • Go back to previous song.
-
 `$queue`
 • Show current queue.
-
 `$stop`
 • Stop playback and disconnect.
-
+`$join`
+• Joins the voice channel.
+`$leave`
+• Leaves the voice channel.
 `$ping`
 • Check bot status.
-
 `$help`
 • Show this help.
 """
