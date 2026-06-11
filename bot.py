@@ -1,4 +1,5 @@
 import asyncio
+from email import message
 import yt_dlp
 import discord
 
@@ -40,15 +41,12 @@ async def on_message(message):
     if message.author == client.user:
         return
     content = message.content
-
     # ---------------- PING ----------------
     if content.startswith("$ping"):
         await message.channel.send("Pong!")
-
     # ---------------- JOIN ----------------
     elif content.startswith("$join"):
         await join_voice_channel_from_message(message)
-
     # ---------------- LEAVE ----------------
     elif content.startswith("$leave"):
         vc = message.guild.voice_client
@@ -56,11 +54,27 @@ async def on_message(message):
             song_queue.clear()
             song_history.clear()
             await vc.disconnect()
-
     # ---------------- HELP ----------------
     elif content.startswith("$help"):
         await send_help(message.channel)
-
+    
+    # ---------------- SPAM BY USERID ----------------
+    elif content.startswith("$spam"):
+        parts = content.split(" ")
+        if len(parts) < 2:
+            await message.channel.send("Usage: $spam <user_id>")
+            return
+        user_id = parts[1]
+        try:
+            user_id = int(user_id)
+            user = await client.fetch_user(user_id)
+            if user:
+                for _ in range(5):
+                    await message.channel.send(f"<@{user_id}> is a silly wanker", allowed_mentions=discord.AllowedMentions(users=True))
+            else:
+                await message.channel.send("User not found.")
+        except ValueError:
+            await message.channel.send("Invalid user ID.")
     # ---------------- PLAY ----------------
     elif content.startswith("$play"):
         parts = content.split(" ", 1)
@@ -103,7 +117,6 @@ async def on_message(message):
                 song_data,
                 message.channel
             )
-
     # ---------------- NEXT ----------------
     elif content.startswith("$next"):
         vc = message.guild.voice_client
@@ -118,7 +131,6 @@ async def on_message(message):
             vc.stop()
             await vc.disconnect()
             await message.channel.send("⏹ Stopped and disconnected.")
-
     # ---------------- QUEUE ----------------
     elif content.startswith("$queue"):
         if not song_queue:
